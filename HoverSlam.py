@@ -64,6 +64,7 @@ class HoverSlam:
         
             #target_speed = self.target.velocity(self.surface_ref)
             #target_hor_speed = np.linalg.norm(target_speed[1:])
+            
 
             aim_dir = [2, 0, 0] + error_dir/2
 
@@ -103,9 +104,6 @@ class HoverSlam:
 
     def normalize(self, vector):
         return vector / np.linalg.norm(vector)
-
-    def altitude(self):
-        return max(0, self.surface_altitude() + self.vessel.bounding_box(self.surface_ref)[0][0])
     
 
 if __name__ == '__main__':
