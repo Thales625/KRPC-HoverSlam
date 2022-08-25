@@ -1,8 +1,7 @@
 import krpc
 from time import sleep
 import numpy as np
-from math import sqrt, sin, cos, atan, radians, degrees
-from PID import PIDController
+from math import sin, atan, radians, degrees
 
 class HoverSlam:
     def __init__(self, vessel=None):
@@ -25,10 +24,6 @@ class HoverSlam:
         self.vertical_speed = self.conn.add_stream(getattr, self.flight, "vertical_speed")
         self.surface_altitude = self.conn.add_stream(getattr, self.flight, "surface_altitude")
         self.pitch = self.conn.add_stream(getattr, self.vessel.flight(self.surface_ref), "pitch")
-
-
-        # PID
-        self.direction_controller = PID_3D()
 
 
         # Params
@@ -112,31 +107,6 @@ class HoverSlam:
     def altitude(self):
         return max(0, self.surface_altitude() + self.vessel.bounding_box(self.surface_ref)[0][0])
     
-
-class PID_3D():
-    def __init__(self) -> None:
-        self.pid_x = PIDController()
-        self.pid_y = PIDController()
-        self.pid_z = PIDController()
-
-        #self.pid_x.adjust_pid(0.5, 0.25, 0.2)
-        #self.pid_y.adjust_pid(0.5, 0.25, 0.2)
-        #self.pid_z.adjust_pid(0.5, 0.25, 0.2)
-
-        self.target_x = 0
-        self.target_y = 0
-        self.target_z = 0
-
-    def calcule(self, vector):
-        x, y, z = vector
-        o_x = self.pid_x.calc_pid(x, self.target_x)
-        o_y = self.pid_y.calc_pid(y, self.target_y)
-        o_z = self.pid_z.calc_pid(z, self.target_z)
-        return (-o_x, -o_y, -o_z)
-
-    def set_target(self, vector):
-        self.target_x, self.target_y, self.target_z = vector
-
 
 if __name__ == '__main__':
     HoverSlam()
