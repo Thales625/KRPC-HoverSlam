@@ -1,7 +1,8 @@
 import krpc
 from time import sleep
 import numpy as np
-
+from math import sqrt, sin, cos, atan, radians, degrees
+from PID import PIDController
 
 class HoverSlam:
     def __init__(self, vessel=None):
@@ -19,59 +20,83 @@ class HoverSlam:
             print('Selecione um alvo!')
             exit()
 
+
         # Streams
         self.vertical_speed = self.conn.add_stream(getattr, self.flight, "vertical_speed")
         self.surface_altitude = self.conn.add_stream(getattr, self.flight, "surface_altitude")
+        self.pitch = self.conn.add_stream(getattr, self.vessel.flight(self.surface_ref), "pitch")
+
+
+        # PID
+        self.direction_controller = PID_3D()
 
 
         # Params
         self.ag = self.body.surface_gravity
+        self.final_speed = -2
+        self.aproximating_speed = 10
 
 
         # Initializing
         self.vessel.control.rcs = True
         self.vessel.auto_pilot.engage()
+        self.vessel.auto_pilot.reference_frame = self.surface_ref
 
 
         # Drawing
         self.line_lenght = 10
         self.target_dir_draw = self.drawing.add_direction((0, 0, 0), self.surface_ref)
         self.prograde_dir_draw = self.drawing.add_direction((0, 0, 0), self.surface_ref)
+        self.aim_dir_draw = self.drawing.add_direction((0, 0, 0), self.surface_ref)
         self.target_dir_draw.color = (255, 0, 0)
         self.prograde_dir_draw.color = (0, 0, 255)
+        self.aim_dir_draw.color = (0, 255, 0)
 
 
         # Main Loop
         while True:
+            sleep(0.01)
             target_pos = np.array(self.target.position(self.surface_ref))
             target_dir = self.normalize(target_pos)
             prograde_dir = self.normalize(np.array(self.velocity(self.vessel, self.surface_ref)))
             error_dir = target_dir - prograde_dir
 
-            self.target_dir_draw.end = target_dir * self.line_lenght
-            self.prograde_dir_draw.end = prograde_dir * self.line_lenght
+        
+            #target_speed = self.target.velocity(self.surface_ref)
+            #target_hor_speed = np.linalg.norm(target_speed[1:])
 
-            aim_dir = [1, 0, 0] + error_dir
+            aim_dir = [3, 0, 0] + error_dir/2
 
-            print(error_dir)
-
-            aeng = self.vessel.available_thrust / self.vessel.mass
-            throttle_cancel_ag = (self.ag / aeng)
-
-            throttle = np.linalg.norm(error_dir)
-            self.vessel.control.throttle = throttle + (throttle_cancel_ag if error_dir[0] > 0 else 0)
-            #self.vessel.control.throttle = throttle + (throttle_cancel_ag if error_dir[0] > 0 else -throttle_cancel_ag)
-
-            # Limitar o pitch para 10Deg
+            #aim_dir = self.limit_pitch(aim_dir, 10)
 
             self.aim_pos(aim_dir)
 
-        
+            aeng = self.vessel.available_thrust / self.vessel.mass
+            throttle= (self.ag + (self.final_speed - self.vertical_speed()) * 5) / (aeng * sin(radians(self.pitch())))
+            self.vessel.control.throttle = throttle
+
+            # Usar o aim_dir[0] para controlar velocidade de aproximação
+
+
+            # Drawing
+            self.target_dir_draw.end = target_dir * self.line_lenght
+            self.prograde_dir_draw.end = prograde_dir * self.line_lenght
+            self.aim_dir_draw.end = aim_dir * self.line_lenght
+
+            # Limitar velocidade vertical usando a gravidade
+            # Limitar a velocidade horizontal multiplicando o error_dir
+            #aim = self.direction_controller.calcule(aim_dir)
+
+    
+    def limit_pitch(self, dir, pitch):
+        h = np.sqrt(np.sum(dir[1:]**2))
+        actual_pitch = atan(h/dir[0])
+
+        print(degrees(actual_pitch))
+        return dir
 
     def aim_pos(self, dir):
         self.vessel.auto_pilot.target_direction = dir
-
-
 
     def velocity(self, vessel, ref_frame): # Get velocity in self reference
         return self.space_center.transform_direction(vessel.velocity(self.body_ref), self.body_ref, ref_frame)
@@ -82,6 +107,31 @@ class HoverSlam:
     def altitude(self):
         return max(0, self.surface_altitude() + self.vessel.bounding_box(self.surface_ref)[0][0])
     
+
+class PID_3D():
+    def __init__(self) -> None:
+        self.pid_x = PIDController()
+        self.pid_y = PIDController()
+        self.pid_z = PIDController()
+
+        #self.pid_x.adjust_pid(0.5, 0.25, 0.2)
+        #self.pid_y.adjust_pid(0.5, 0.25, 0.2)
+        #self.pid_z.adjust_pid(0.5, 0.25, 0.2)
+
+        self.target_x = 0
+        self.target_y = 0
+        self.target_z = 0
+
+    def calcule(self, vector):
+        x, y, z = vector
+        o_x = self.pid_x.calc_pid(x, self.target_x)
+        o_y = self.pid_y.calc_pid(y, self.target_y)
+        o_z = self.pid_z.calc_pid(z, self.target_z)
+        return (-o_x, -o_y, -o_z)
+
+    def set_target(self, vector):
+        self.target_x, self.target_y, self.target_z = vector
+
 
 if __name__ == '__main__':
     HoverSlam()
