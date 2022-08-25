@@ -33,14 +33,19 @@ class HoverSlam:
 
         # Params
         self.ag = self.body.surface_gravity
-        self.final_speed = -2
+        self.final_speed = -3
         self.aproximating_speed = 10
 
 
         # Initializing
         self.vessel.control.rcs = True
         self.vessel.auto_pilot.engage()
-        self.vessel.auto_pilot.reference_frame = self.surface_ref
+        #self.vessel.auto_pilot.reference_frame = self.surface_ref
+        #self.vessel.auto_pilot.stopping_time = (0.1, 0.1, 0.1)
+        #self.vessel.auto_pilot.deceleration_time = (1, 1, 1)
+        self.vessel.auto_pilot.target_roll = -90
+        self.vessel.auto_pilot.reference_frame = self.body_ref
+
 
 
         # Drawing
@@ -65,7 +70,7 @@ class HoverSlam:
             #target_speed = self.target.velocity(self.surface_ref)
             #target_hor_speed = np.linalg.norm(target_speed[1:])
 
-            aim_dir = [3, 0, 0] + error_dir/2
+            aim_dir = [2, 0, 0] + error_dir/2
 
             #aim_dir = self.limit_pitch(aim_dir, 10)
 
@@ -96,7 +101,7 @@ class HoverSlam:
         return dir
 
     def aim_pos(self, dir):
-        self.vessel.auto_pilot.target_direction = dir
+        self.vessel.auto_pilot.target_direction = self.space_center.transform_direction(dir, self.surface_ref, self.body_ref)
 
     def velocity(self, vessel, ref_frame): # Get velocity in self reference
         return self.space_center.transform_direction(vessel.velocity(self.body_ref), self.body_ref, ref_frame)
